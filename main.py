@@ -15,7 +15,7 @@ if not GEMINI_API_KEY:
     raise Exception("GEMINI_API_KEY not found in environment.")
 
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash")
+model = genai.GenerativeModel("gemini-2.5-flash")
 
 app = FastAPI()
 
