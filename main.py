@@ -5,10 +5,8 @@ import google.generativeai as genai
 import os
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
 load_dotenv()
 
-# Get Gemini API key from environment
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise Exception("GEMINI_API_KEY not found in environment.")
@@ -18,16 +16,14 @@ model = genai.GenerativeModel("gemini-1.5-flash")
 
 app = FastAPI()
 
-# ✅ Enable CORS for all origins (change as needed for production)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Use specific origins in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Input schema
 class FarmerRequest(BaseModel):
     earning: int
     location: str
@@ -36,40 +32,56 @@ class FarmerRequest(BaseModel):
 @app.post("/get-loans")
 async def get_loans(request: FarmerRequest):
     prompt = f"""
-You are an expert government loan and microfinance assistant for Indian farmers.
+You are a government loan assistant.
 
-Given the following:
+Given:
 - Location: {request.location}
-- Annual Income: ₹{request.earning}
+- Income: ₹{request.earning}
 - Crop: {request.crop}
 
-Suggest up to 5 relevant government or microfinance loan schemes for this farmer.
+Provide values for these 25 variables (no explanation):
 
-Return the response **only as a JSON array** with the following fields:
-- loan_name
-- bank
-- amount
-- chance
-- link
+loan1_name: ...
+loan1_bank: ...
+loan1_amount: ...
+loan1_chance: ...
+loan1_link: ...
 
-Example output format:
-[
-  {{
-    "loan_name": "Kisan Credit Card",
-    "bank": "State Bank of India",
-    "amount": "₹50,000",
-    "chance": "85%",
-    "link": "https://example.com/kcc"
-  }},
-  ...
-]
-Do not include any explanation — return only the JSON.
+loan2_name: ...
+loan2_bank: ...
+loan2_amount: ...
+loan2_chance: ...
+loan2_link: ...
+
+(continue till loan5)
+Only return all 25 key-value lines exactly like shown.
 """
 
     try:
         response = model.generate_content(prompt)
-        raw_json = response.text.strip()
-        print("🧾 Raw Gemini Output:\n", raw_json)
-        return raw_json
+        raw_text = response.text.strip()
+        print("🧾 Gemini Output:\n", raw_text)
+
+        # Convert key-value text into dictionary
+        values = {}
+        for line in raw_text.splitlines():
+            if ':' in line:
+                key, value = line.split(':', 1)
+                values[key.strip()] = value.strip()
+
+        # Reconstruct into list of 5 loans
+        loans = []
+        for i in range(1, 6):
+            loan = {
+                "loan_name": values.get(f"loan{i}_name", ""),
+                "bank": values.get(f"loan{i}_bank", ""),
+                "amount": values.get(f"loan{i}_amount", ""),
+                "chance": values.get(f"loan{i}_chance", ""),
+                "link": values.get(f"loan{i}_link", "")
+            }
+            loans.append(loan)
+
+        return loans
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
