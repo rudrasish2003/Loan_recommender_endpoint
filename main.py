@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import google.generativeai as genai
 import os
@@ -16,6 +17,15 @@ genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
 app = FastAPI()
+
+# ✅ Enable CORS for all origins (change as needed for production)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Use specific origins in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Input schema
 class FarmerRequest(BaseModel):
@@ -60,6 +70,6 @@ Do not include any explanation — return only the JSON.
         response = model.generate_content(prompt)
         raw_json = response.text.strip()
         print("🧾 Raw Gemini Output:\n", raw_json)
-        return raw_json  # Return as plain string
+        return raw_json
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
