@@ -4,7 +4,7 @@ import google.generativeai as genai
 from typing import List
 import os
 from dotenv import load_dotenv
-import re
+import json
 
 # Load environment variables from .env file
 load_dotenv()
@@ -36,52 +36,51 @@ class LoanResponse(BaseModel):
 @app.post("/get-loans", response_model=List[LoanResponse])
 async def get_loans(request: FarmerRequest):
     prompt = f"""
-You are an expert government loan and microfinance assistant for Indian farmers. 
-Given:  
-- Location: {request.location}  
-- Annual Income: ₹{request.earning}  
-- Crop: {request.crop}  
+You are an expert government loan and microfinance assistant for Indian farmers.
 
-Find the most accessible loans and microloans a farmer in this scenario can apply for in their rural region.
+Given the following:
+- Location: {request.location}
+- Annual Income: ₹{request.earning}
+- Crop: {request.crop}
 
-Return results in a table with maximum 5 rows, each being very short and precise (within 20 words total).
+Suggest up to 5 relevant government or microfinance loan schemes for this farmer.
 
-Table format:
-Loan Name | Bank | Amount (₹) | Chance (%) | Link
+Return the response **only as a JSON array** with the following fields:
+- loan_name
+- bank
+- amount
+- chance
+- link
+
+Example output format:
+[
+  {{
+    "loan_name": "Kisan Credit Card",
+    "bank": "State Bank of India",
+    "amount": "₹50,000",
+    "chance": "85%",
+    "link": "https://example.com/kcc"
+  }},
+  ...
+]
+Do not include any extra explanation or formatting — return only the JSON.
 """
 
     try:
         response = model.generate_content(prompt)
-        table = response.text.strip()
+        raw_output = response.text.strip()
 
-        # 🚨 DEBUG: Print raw Gemini output
-        print("\n🧾 Raw Gemini Response:\n")
-        print(table)
-        print("\n🔍 Parsing table rows...\n")
+        # 🧾 Debug: Print raw Gemini response
+        print("\n🧾 Gemini JSON Response:\n", raw_output)
 
+        # Attempt to parse JSON
+        data = json.loads(raw_output)
+        results = [LoanResponse(**item) for item in data]
+
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Failed to parse Gemini JSON response.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-    # Parse response table
-    rows = re.findall(r"^(?!Loan Name).*?\|.*?\|.*?\|.*?\|.*?$", table, re.MULTILINE)
-
-    # 🚨 DEBUG: Print parsed rows
-    print(f"🧩 Extracted Rows ({len(rows)}):")
-    for r in rows:
-        print(r)
-
-    results = []
-
-    for row in rows:
-        parts = [part.strip() for part in row.split("|")]
-        if len(parts) == 5:
-            results.append(LoanResponse(
-                loan_name=parts[0],
-                bank=parts[1],
-                amount=parts[2],
-                chance=parts[3],
-                link=parts[4]
-            ))
 
     if not results:
         raise HTTPException(status_code=404, detail="No valid loan results found.")
