@@ -15,7 +15,7 @@ if not GEMINI_API_KEY:
     raise Exception("GEMINI_API_KEY not found in environment.")
 
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-2.5-flash")
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 app = FastAPI()
 
@@ -53,11 +53,23 @@ Loan Name | Bank | Amount (₹) | Chance (%) | Link
     try:
         response = model.generate_content(prompt)
         table = response.text.strip()
+
+        # 🚨 DEBUG: Print raw Gemini output
+        print("\n🧾 Raw Gemini Response:\n")
+        print(table)
+        print("\n🔍 Parsing table rows...\n")
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
     # Parse response table
     rows = re.findall(r"^(?!Loan Name).*?\|.*?\|.*?\|.*?\|.*?$", table, re.MULTILINE)
+
+    # 🚨 DEBUG: Print parsed rows
+    print(f"🧩 Extracted Rows ({len(rows)}):")
+    for r in rows:
+        print(r)
+
     results = []
 
     for row in rows:
