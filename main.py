@@ -1,10 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import google.generativeai as genai
-from typing import List
 import os
 from dotenv import load_dotenv
-import json
 
 # Load environment variables from .env file
 load_dotenv()
@@ -25,15 +23,7 @@ class FarmerRequest(BaseModel):
     location: str
     crop: str
 
-# Output schema
-class LoanResponse(BaseModel):
-    loan_name: str
-    bank: str
-    amount: str
-    chance: str
-    link: str
-
-@app.post("/get-loans", response_model=List[LoanResponse])
+@app.post("/get-loans")
 async def get_loans(request: FarmerRequest):
     prompt = f"""
 You are an expert government loan and microfinance assistant for Indian farmers.
@@ -63,26 +53,13 @@ Example output format:
   }},
   ...
 ]
-Do not include any extra explanation or formatting — return only the JSON.
+Do not include any explanation — return only the JSON.
 """
 
     try:
         response = model.generate_content(prompt)
-        raw_output = response.text.strip()
-
-        # 🧾 Debug: Print raw Gemini response
-        print("\n🧾 Gemini JSON Response:\n", raw_output)
-
-        # Attempt to parse JSON
-        data = json.loads(raw_output)
-        results = [LoanResponse(**item) for item in data]
-
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="Failed to parse Gemini JSON response.")
+        raw_json = response.text.strip()
+        print("🧾 Raw Gemini Output:\n", raw_json)
+        return raw_json  # Return as plain string
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-    if not results:
-        raise HTTPException(status_code=404, detail="No valid loan results found.")
-    
-    return results
